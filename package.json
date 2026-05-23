@@ -1,0 +1,14 @@
+{
+  "name": "marketsnap",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "dashboard",
+    "agents"
+  ],
+  "scripts": {
+    "test": "pnpm --recursive test",
+    "lint": "pnpm --recursive lint"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
