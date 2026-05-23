@@ -7,27 +7,76 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  # This repo is a teaching sample for the layered CLAUDE.md setup, not a
+  # deployable app. CI verifies the teaching invariants are intact so a
+  # well-meaning refactor doesn't accidentally delete the bits the
+  # companion video relies on. The Next.js + Anthropic SDK scaffolding
+  # below is meant to be a credible workspace shape; running `pnpm
+  # install` against pinned dependencies is out of scope for this CI.
+  verify-teaching-structure:
+    name: Verify teaching structure
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Layered CLAUDE.md files exist
+        run: |
+          test -f CLAUDE.md           || { echo "Missing root CLAUDE.md"; exit 1; }
+          test -f dashboard/CLAUDE.md || { echo "Missing dashboard/CLAUDE.md"; exit 1; }
+          test -f agents/CLAUDE.md    || { echo "Missing agents/CLAUDE.md"; exit 1; }
+          test -f CLAUDE-BLOATED.md   || { echo "Missing CLAUDE-BLOATED.md (anti-example)"; exit 1; }
+          echo "OK: all layered CLAUDE.md files in place"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Root CLAUDE.md stays lean
+        run: |
+          lines=$(wc -l < CLAUDE.md)
+          if [ "$lines" -gt 30 ]; then
+            echo "Root CLAUDE.md is $lines lines. Keep it under 30."
+            echo "If you really need more, ask: would removing each line cause Claude to make a real mistake?"
+            exit 1
+          fi
+          echo "OK: root CLAUDE.md is $lines lines"
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Hook scripts are executable
+        run: |
+          test -x .claude/hooks/session-start.sh             || { echo "session-start.sh not executable"; exit 1; }
+          test -x .claude/hooks/propose-claude-md-updates.sh || { echo "propose-claude-md-updates.sh not executable"; exit 1; }
+          echo "OK: hook scripts are executable"
 
-      - name: Lint
-        run: pnpm lint
+      - name: All skills have YAML frontmatter
+        run: |
+          for f in .claude/skills/*/SKILL.md; do
+            first=$(head -n 1 "$f")
+            if [ "$first" != "---" ]; then
+              echo "Missing YAML frontmatter: $f (first line was: $first)"
+              exit 1
+            fi
+            grep -q "^name:" "$f"        || { echo "$f missing 'name:'"; exit 1; }
+            grep -q "^description:" "$f" || { echo "$f missing 'description:'"; exit 1; }
+          done
+          echo "OK: $(ls .claude/skills/*/SKILL.md | wc -l) skill(s) have valid frontmatter"
 
-      - name: Test
-        run: pnpm test
+      - name: Bloated example contains the canonical pruning lines
+        run: |
+          grep -q "Use camelCase for variable names" CLAUDE-BLOATED.md                       || { echo "Missing 'camelCase' example"; exit 1; }
+          grep -q "Always run tests before committing" CLAUDE-BLOATED.md                     || { echo "Missing 'run tests' example"; exit 1; }
+          grep -q "For payment-related code, never log the raw card number" CLAUDE-BLOATED.md || { echo "Missing 'payment card' example"; exit 1; }
+          echo "OK: pruning examples are intact"
+
+      - name: Payment gotcha mirrored in agents/CLAUDE.md
+        run: |
+          grep -qi "never log the raw card number" agents/CLAUDE.md || {
+            echo "agents/CLAUDE.md should keep the payment-card gotcha (it's the 'keep' rule from the pruning demo)"
+            exit 1
+          }
+          echo "OK: payment gotcha present in agents/CLAUDE.md"
+
+      - name: No em-dashes in CLAUDE.md files (house style)
+        run: |
+          if grep -l "—" CLAUDE.md dashboard/CLAUDE.md agents/CLAUDE.md 2>/dev/null; then
+            echo "Em-dashes found above. House style is no em-dashes."
+            exit 1
+          fi
+          echo "OK: no em-dashes"
