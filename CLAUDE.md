@@ -4,8 +4,8 @@ AI-powered customer insights for small SaaS teams.
 
 ## Where things live
 
-- `dashboard/` — Next.js 15 customer dashboard. UI, routing, billing, tRPC API, Prisma schema.
-- `agents/` — TypeScript agent layer. Orchestrator, tools, prompts.
+- `dashboard/` Next.js 15 customer dashboard. UI, routing, billing, tRPC API, Prisma schema.
+- `agents/` TypeScript agent layer. Orchestrator, tools, prompts.
 
 ## Repo-wide gotcha
 
