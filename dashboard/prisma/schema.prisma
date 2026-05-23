@@ -1,0 +1,77 @@
+// This is the Prisma schema for MarketSnap.
+//
+// Run `pnpm db:generate` after editing.
+// Run `pnpm db:migrate -- --name <descriptive-name>` to create a migration.
+// Per agents/CLAUDE.md, any code that touches the Stripe customer ID goes
+// through `agents/src/tools/stripe.ts` (uses the maskedCardId helper).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  name            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  stripeCustomerId String?       @unique
+  subscription     Subscription?
+  reports          Report[]
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeSubscriptionId String @unique
+  status             SubscriptionStatus
+  plan               Plan
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean  @default(false)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  prompt      String   @db.Text
+  summary     String?  @db.Text
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([userId, createdAt])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+}
+
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+enum ReportStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
